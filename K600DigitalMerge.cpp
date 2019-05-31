@@ -1,21 +1,26 @@
 //This code written by Philip Adsley - e-mail padsley@gmail.com with any suggestions, problems, queries or comments
 #include "K600DigitalMerge.h"
 
+bool VerboseFlag = false;
+bool VeryVerboseFlag = false;
+
 int main(int argc, char *argv[])
 {
     bool FoundVME = false;
     bool FoundDig = false;
-    bool VerboseFlag = false;
-
+    
+    
     int EventOffset = 0;
     
     TGraph *gTACRatios = new TGraph();
+    gTACRatios->SetName("gTACRatios");
     TGraph *gSkips = new TGraph();
-    int GraphCounter = 0;
+    gSkips->SetName("gSkips");
+    int MergedEventsCounter = 0;
     
     if(argc!=4)
     {
-        fprintf(stderr, "usage: mcerr <filename for VME DAQ> <filename for digital DAQ> <verbosity setting - 1 is verbose, anything else is false>\n");
+        fprintf(stderr, "usage: mcerr <filename for VME DAQ> <filename for digital DAQ> <verbosity setting - 1 is verbose, 2 is very verbose, anything else is false>\n");
         exit(1);
     }
     
@@ -24,18 +29,23 @@ int main(int argc, char *argv[])
         std::cout << "Setting verbose mode on" << std::endl;
         VerboseFlag = true;
     }
+    else if(atoi(argv[3]) == 2)
+    {
+        std::cout << "Setting very verbose mode on" << std::endl;
+        VerboseFlag = true;
+        VeryVerboseFlag = true;
+    }
     
     std::cout << "Run number is set according to the VME file" << std::endl;
     
     std::string RunName = argv[1];
-    if(VerboseFlag)std::cout << RunName.substr(6,5) << std::endl;
+    if(VeryVerboseFlag)std::cout << RunName.substr(6,5) << std::endl;
     int RunNumber = atoi(RunName.substr(6,5).c_str());
     if(VerboseFlag)std::cout << "Run number: " << RunNumber << std::endl;
     
     std::cout << "Using VME DAQ file: " << argv[1] << std::endl;
     
     TFile *fVME = TFile::Open(argv[1]);
-    
     if(!fVME)
     {
         fprintf(stderr, "Cannot find VME input file given\n");
@@ -44,8 +54,13 @@ int main(int argc, char *argv[])
     else
     {
         FoundVME = true;
-        if(VerboseFlag)fVME->ls();
+        if(VeryVerboseFlag)fVME->ls();
     }
+    
+    TTree *tVME = (TTree*)fVME->Get("DATA");
+    
+    tVME->SetBranchAddress("TAC",&VMETAC);
+    TTreeReader ReaderVME("DATA",fVME);
     
     std::cout << "Using digital DAQ file: " << argv[2] << std::endl;
     
@@ -59,148 +74,115 @@ int main(int argc, char *argv[])
     else
     {
         FoundDig = true;
-        if(VerboseFlag)fDig->ls();
+        if(VeryVerboseFlag)fDig->ls();
     }
     
-    
-    //Get the information from the VME TTree - how many TBranches, what the names are etc.
-    TTree *tVME = (TTree*)fVME->FindObjectAny("DATA");
-    if(VerboseFlag)tVME->Print();
-    
-    TObjArray *branchListVME = (TObjArray*)tVME->GetListOfBranches();
-    TObjArray *leafListVME   = (TObjArray*)tVME->GetListOfLeaves();
-    int nBranchesVME = tVME->GetNbranches();
-    
-    TString *BranchNamesVME = new TString[nBranchesVME];
-    TString *LeafTypesVME = new TString[nBranchesVME];
-    
-    for(unsigned int i=0;i<nBranchesVME;i++)
-    {
-        BranchNamesVME[i] = branchListVME->At(i)->GetName();
-        if(VerboseFlag)std::cout << "BranchNamesVME[" << i << "]: " << BranchNamesVME[i] << std::endl;
-        LeafTypesVME[i] = (tVME->GetLeaf(leafListVME->At(i)->GetName()))->GetTypeName();
-        if(VerboseFlag)std::cout << "LeafTypesVME[" << i << "]: " << LeafTypesVME[i] << std::endl;
-    }
-    
-    if(VerboseFlag)std::cout << "nBranchesVME: " << nBranchesVME << std::endl;
-    
-    //Now do the same as above for the digital DAQ TBranches
-    TTree *tDig = (TTree*)fDig->FindObjectAny("DATA");
-    if(VerboseFlag)tDig->Print();
-    
-    TObjArray *branchListDig = (TObjArray*)tDig->GetListOfBranches();
-    TObjArray *leafListDig   = (TObjArray*)tDig->GetListOfLeaves();
-    int nBranchesDig = tDig->GetNbranches();
-    
-    TString *BranchNamesDig = new TString[nBranchesDig];
-    TString *LeafTypesDig   = new TString[nBranchesDig];
-    int *LeafLengthsDig = new int [nBranchesDig];
-    
-    int DigInts = 0;
-    int DigDoubles = 0;
-    
-    for(unsigned int i=0;i<nBranchesDig;i++)
-    {
-        BranchNamesDig[i] = branchListDig->At(i)->GetName();
-        if(VerboseFlag)std::cout << "BranchNamesDig[" << i << "]: " << BranchNamesDig[i] << std::endl;
-        LeafTypesDig[i] = (tDig->GetLeaf(leafListDig->At(i)->GetName()))->GetTypeName();
-        if(VerboseFlag)std::cout << "LeafTypesDig[" << i << "]: " << LeafTypesDig[i] << std::endl;
-        LeafLengthsDig[i] = (tDig->GetLeaf(leafListDig->At(i)->GetName()))->GetLen();
-        if(VerboseFlag)std::cout << "LeafLengthsDig[" << i << "]: " << LeafLengthsDig[i] << std::endl;
-        
-        if(LeafTypesDig[i] == "Int_t")DigInts++;
-        else if(LeafTypesDig[i] == "Double_t")DigDoubles++;
-        else std::cout << "Leaf type not found" << std::endl;
-    }
-    
-    if(VerboseFlag)std::cout << "nBranchesDig: " << nBranchesDig << std::endl;
-    
+    TTree *tDig = (TTree*)fDig->Get("DATA");
+    tDig->SetBranchAddress("tac_energy",&DigTAC);
+//     for(Long64_t i = 0; i<tDig->GetEntries();i++)
+//     {
+//         tDig->GetEntry(i);
+//         std::cout << "DigTAC: " << DigTAC << std::endl;
+//     }
+//     
     
     //Now creat the output merged file
     TFile *fOut = new TFile(Form("merged%d.root",RunNumber),"RECREATE");
-    TTree *trout = new TTree("DATA","Merged data from K600 VME and digital DAQs");
+    TTree *trout = (TTree*)tVME->Clone("MergedData");
     
-    int VMETAC = 0;
-    double DigTAC = 0;
-    tVME->SetBranchAddress("TAC",&VMETAC);
-    tDig->SetBranchAddress("tac_energy",&DigTAC);
+    int DigEventNumber = 0;
+    double TACRatio = 0;
+    trout->Branch("DigEventNumber",&DigEventNumber,"DigEventNumber/I");
+    trout->Branch("TACRatio",&TACRatio,"TACRatio/D");
     
-    //Do it first for the VME DAQ branches
-    for(unsigned int i=0;i<nBranchesVME;i++)
-    {
-//         tVME->Branch(
-    }
+    int nDigitalTreeBranches = tDig->GetNbranches();
     
-    //...and now do it for the digital DAQ branches
-    for(unsigned int i=0;i<nBranchesDig;i++)
-    {
-        char type;
-        if(LeafTypesDig[i] == "Int_t")type = "I";
-        else if(LeafTypesDig[i] == "Double_t")type = "D";
-        else std::cout << "Leaf type not defined" << std::endl;
-        
-        if(LeafLengthsDig[i]==1)trout->Branch(BranchNamesDig[i],,Form("%s/%s",BranchNames[i],type));
-        else trout->Branch(BranchNamesDig[i],,Form("%s[%d]/%s",BranchNames[i],LeafLengthsDig[i],type));
-    }
     
-    if(VerboseFlag)trout->Print();//Now print out the information in the combined TTree to check that the branches have the right names and types and sizes
+    if(VeryVerboseFlag)trout->Print();//Now print out the information in the combined TTree to check that the branches have the right names and types and sizes
     
     //Now loop over all the entries in the VME DAQ to look for 
-    for(Long64_t jentry;jentry<tVME->GetEntries();jentry++)
+    for(Long64_t i=0;i<tVME->GetEntries();i++)
     {
-        tVME->GetEntry(jentry);
+        if(VeryVerboseFlag)std::cout << "Entry: " << i << std::endl;
         
-        tDig->GetEntry(jentry + EventOffset);
+        tVME->GetEntry(i);
+        if(VeryVerboseFlag)std::cout << "VMETAC: " << VMETAC << std::endl;
         
+        tDig->GetEntry(i + EventOffset);
+        if(VeryVerboseFlag)std::cout << "DigTAC: " << DigTAC << std::endl;
         
-        //Compute the TAC ratio from the VME and digital DAQ data
-//         tacratio = 0.08*DigTacEnergy/(MidasTac-200);
-        double TACRatio = TACPar[0] * DigTAC / ((double)VMETAC - TACPar[1]);
+        TACRatio = TACPar[0] * DigTAC / ((double)VMETAC - TACPar[1]);
         
-        if((TACRatio>TACRatioLimits[0] && TACRatio<TACRatioLimits[1]) || TACRatio>TACRatioLimits[2])
+//         if(VeryVerboseFlag)std::cout << "TACRatio: " << TACRatio << std::endl;
+        if(!(TACRatio>TACRatioLimits[0] && TACRatio<TACRatioLimits[1]) && DigTAC>0)
         {
-//             EventOffset = FindNextDigitalEvent(jentry,EventOffset,tVME,tDig);
+            if(VeryVerboseFlag)std::cout << "TACRatio is bad for VME event number: " << i << "\t Current TACRatio: " << TACRatio << std::endl;
+            EventOffset = ReAlignDAQs(i,EventOffset,tVME,tDig);
+            tDig->GetEntry(i + EventOffset);
+            TACRatio = TACPar[0] * DigTAC / ((double)VMETAC - TACPar[1]);
+        }
+        
+        if(DigTAC>0 && TACRatio>TACRatioLimits[0] && TACRatio<TACRatioLimits[1])
+        {
+            gTACRatios->SetPoint(MergedEventsCounter,MergedEventsCounter,TACRatio);
+            gSkips->SetPoint(MergedEventsCounter,MergedEventsCounter,EventOffset);
+            MergedEventsCounter++;
+            
+            trout->Fill();
         }
     }
+    
+    if(VerboseFlag)trout->Print();//Print at the end to get some idea if the branches have been filled
+    
+    gTACRatios->Write();
+    gSkips->Write();
+    trout->Write();
     
     fVME->Close();
     fDig->Close();
     fOut->Close();
+    
+    std::cout << "Finished merging files" << std::endl;
+    std::cout << std::endl;
     return 0;
 }
 
-/*
-int ReAlignDAQs(int MidasEventNumber, int DigitalEventSkip, TTree* MidasTree, TTree *DigitalTree)
+
+int ReAlignDAQs(int VMEEventNumber, int EventOffset, TTree* tVME, TTree *tDig)
 {
-    cout << "Bad TAC ratio - going to try to find the next good digital TAC event" << endl;
+    if(VeryVerboseFlag)std::cout << "Bad TAC ratio - going to try to find the next good digital TAC event" << std::endl;
     
-    int result = DigitalEventSkip; //Return number of skipped events to get a good correlation again
+    int result = EventOffset; //Return number of skipped events to get a good correlation again
     
-    cout << "Starting with skipping " << result << " events" << endl;    
+    if(VeryVerboseFlag)std::cout << "Starting with skipping " << result << " events" << std::endl;    
     
     bool MatchEvents = false;
     bool PositiveMove = true;
     int StepSize = 1;
     
-    while(abs(result-DigitalEventSkip)<100 && !MatchEvents)
+    while(abs(result-EventOffset)<EventOffsetLimit && !MatchEvents)
     {
-        cout << "DigitalEventSkip = " << result << endl;
-        cout << "This is " << result-DigitalEventSkip << " more skips since the last matching event" << endl;
+        if(VeryVerboseFlag)std::cout << "EventOffset = " << result << std::endl;
+        if(VeryVerboseFlag)std::cout << "This is " << result-EventOffset << " more skips since the last matching event" << std::endl;
         
-        MidasTree->GetEntry(MidasEventNumber);
-        DigitalTree->GetEntry(MidasEventNumber+result);
+        tVME->GetEntry(VMEEventNumber);
+        tDig->GetEntry(VMEEventNumber+result);
+        if(VeryVerboseFlag)std::cout << "Realign - VMETAC: " << VMETAC << std::endl;
+        if(VeryVerboseFlag)std::cout << "Realign - DigTAC: " << DigTAC << std::endl;
         
-        double tacratio = 0.08*DigTacEnergy/(MidasTac-200);
-        cout << "tacratio: " << tacratio << endl;
         
-        if(!((tacratio>lowratio1 && tacratio<hiratio1) || tacratio>lowratio2))
+        double TACRatio = TACPar[0] * DigTAC / ((double)VMETAC - TACPar[1]);
+        
+        if(VeryVerboseFlag)std::cout << "Realign - TACRatio: " << TACRatio << std::endl;
+        
+        if((TACRatio>TACRatioLimits[0] && TACRatio<TACRatioLimits[1]) && DigTAC>0)
         {
             MatchEvents = true;
-            cout << "Found GOOD matching event" << endl;
-        }
+            if(VeryVerboseFlag)std::cout << "Found GOOD matching event with TACRatio of: " << TACRatio << std::endl;
+        } 
         else if(PositiveMove)
         {
-            result = result+StepSize;
+            result = result + StepSize;
             PositiveMove = false;
         }
         else if(!PositiveMove)
@@ -211,8 +193,9 @@ int ReAlignDAQs(int MidasEventNumber, int DigitalEventSkip, TTree* MidasTree, TT
         StepSize++;
     }
     
-    cout << endl;
+    if(VerboseFlag && abs(result - EventOffset)>=EventOffsetLimit)std::cout << "Could not find matching event within an event offset limit of " << EventOffsetLimit << std::endl;
+    
+    if(VeryVerboseFlag)std::cout << std::endl;
     
     return result;
 }
-*/
