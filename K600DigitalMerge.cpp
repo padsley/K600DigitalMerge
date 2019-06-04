@@ -6,6 +6,10 @@ bool VeryVerboseFlag = false;
 
 int main(int argc, char *argv[])
 {
+    gSystem->Load("/home/padsley/codes/k600analyser/GammaData.o");
+    gSystem->Load("/home/padsley/codes/k600analyser/RawData.o");
+    gSystem->ListLibraries();
+    
     bool FoundVME = false;
     bool FoundDig = false;
     
@@ -79,12 +83,16 @@ int main(int argc, char *argv[])
     
     TTree *tDig = (TTree*)fDig->Get("DATA");
     tDig->SetBranchAddress("tac_energy",&DigTAC);
-//     for(Long64_t i = 0; i<tDig->GetEntries();i++)
-//     {
-//         tDig->GetEntry(i);
-//         std::cout << "DigTAC: " << DigTAC << std::endl;
-//     }
-//     
+    //     for(Long64_t i = 0; i<tDig->GetEntries();i++)
+    //     {
+    //         tDig->GetEntry(i);
+    //         std::cout << "DigTAC: " << DigTAC << std::endl;
+    //     }
+    //     
+    
+    GammaData *gammy;
+    RawData *roar;
+    
     
     //Now creat the output merged file
     TFile *fOut = new TFile(Form("merged%d.root",RunNumber),"RECREATE");
@@ -111,24 +119,28 @@ int main(int argc, char *argv[])
         tDig->GetEntry(i + EventOffset);
         if(VeryVerboseFlag)std::cout << "DigTAC: " << DigTAC << std::endl;
         
-        TACRatio = TACPar[0] * DigTAC / ((double)VMETAC - TACPar[1]);
-        
-//         if(VeryVerboseFlag)std::cout << "TACRatio: " << TACRatio << std::endl;
-        if(!(TACRatio>TACRatioLimits[0] && TACRatio<TACRatioLimits[1]) && DigTAC>0)
+        if(VMETAC>0 && DigTAC>0)
         {
-            if(VeryVerboseFlag)std::cout << "TACRatio is bad for VME event number: " << i << "\t Current TACRatio: " << TACRatio << std::endl;
-            EventOffset = ReAlignDAQs(i,EventOffset,tVME,tDig);
-            tDig->GetEntry(i + EventOffset);
-            TACRatio = TACPar[0] * DigTAC / ((double)VMETAC - TACPar[1]);
-        }
-        
-        if(DigTAC>0 && TACRatio>TACRatioLimits[0] && TACRatio<TACRatioLimits[1])
-        {
-            gTACRatios->SetPoint(MergedEventsCounter,MergedEventsCounter,TACRatio);
-            gSkips->SetPoint(MergedEventsCounter,MergedEventsCounter,EventOffset);
-            MergedEventsCounter++;
             
-            trout->Fill();
+            TACRatio = DigTAC / (TACPar[0] + TACPar[1] * (double)VMETAC);
+            
+            //         if(VeryVerboseFlag)std::cout << "TACRatio: " << TACRatio << std::endl;
+            if(TACRatio<TACRatioLimits[0] || TACRatio>TACRatioLimits[1])
+            {
+                if(VeryVerboseFlag)std::cout << "TACRatio is bad for VME event number: " << i << "\t Current TACRatio: " << TACRatio << std::endl;
+                EventOffset = ReAlignDAQs(i,EventOffset,tVME,tDig);
+                tDig->GetEntry(i + EventOffset);
+                TACRatio = DigTAC / (TACPar[0] + TACPar[1] * (double)VMETAC);
+            }
+            
+            if(DigTAC>0 && TACRatio>TACRatioLimits[0] && TACRatio<TACRatioLimits[1])
+            {
+                gTACRatios->SetPoint(MergedEventsCounter,MergedEventsCounter,TACRatio);
+                gSkips->SetPoint(MergedEventsCounter,MergedEventsCounter,EventOffset);
+                MergedEventsCounter++;
+                
+                //             trout->Fill();
+            }
         }
     }
     
@@ -171,11 +183,11 @@ int ReAlignDAQs(int VMEEventNumber, int EventOffset, TTree* tVME, TTree *tDig)
         if(VeryVerboseFlag)std::cout << "Realign - DigTAC: " << DigTAC << std::endl;
         
         
-        double TACRatio = TACPar[0] * DigTAC / ((double)VMETAC - TACPar[1]);
+        double TACRatio = DigTAC / (TACPar[0] + TACPar[1] * (double)VMETAC);
         
         if(VeryVerboseFlag)std::cout << "Realign - TACRatio: " << TACRatio << std::endl;
         
-        if((TACRatio>TACRatioLimits[0] && TACRatio<TACRatioLimits[1]) && DigTAC>0)
+        if(TACRatio>TACRatioLimits[0] && TACRatio<TACRatioLimits[1])
         {
             MatchEvents = true;
             if(VeryVerboseFlag)std::cout << "Found GOOD matching event with TACRatio of: " << TACRatio << std::endl;
@@ -196,6 +208,8 @@ int ReAlignDAQs(int VMEEventNumber, int EventOffset, TTree* tVME, TTree *tDig)
     if(VerboseFlag && abs(result - EventOffset)>=EventOffsetLimit)std::cout << "Could not find matching event within an event offset limit of " << EventOffsetLimit << std::endl;
     
     if(VeryVerboseFlag)std::cout << std::endl;
+    
+    if(!MatchEvents)result = EventOffset;
     
     return result;
 }

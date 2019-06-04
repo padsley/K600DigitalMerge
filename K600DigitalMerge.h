@@ -7,12 +7,15 @@
 #include <TLeaf.h>
 #include <TGraph.h>
 #include <TTreeReader.h>
+#include <TSystem.h>
 #include "GammaData.h"
 #include "RawData.h"
 
-double TACPar[2] = {0.08,200};
+double TACPar[2] = {-2519.02,13.3022};
 
-double TACRatioLimits[3] = {0.8,1.4,1.4};
+double LimitValue = 0.1;
+
+double TACRatioLimits[2] = {1.0-LimitValue,1.0+LimitValue};
 
 int ReAlignDAQs(int VMEEventNumber, int EventOffset, TTree* VMETree, TTree *DigitalTree);
 
