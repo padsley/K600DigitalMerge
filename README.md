@@ -5,9 +5,9 @@ To compile, you must have ROOT installed and working - but not the version from 
 
 To check, do "echo $ROOTSYS" and see what the output is. If you see nothing, then you don't have a working ROOT installation.
 
-To compile: g++ K600DigitalMerge.cpp -o K600DigitalMerge `root-config --cflags --libs`
+To compile: `g++ K600DigitalMerge.cpp -o K600DigitalMerge \`root-config --cflags --libs\``
 
-To run: ./K600DigitalMerge <filename for VME DAQ> <filename for digital DAQ> <verbosity setting - 1 is verbose 2 is very verbose, anything else is false>
+To run: `./K600DigitalMerge <filename for VME DAQ> <filename for digital DAQ> <verbosity setting - 1 is verbose 2 is very verbose, anything else is false>`
 
 In theory you shouldn't need to look at any verbosity option except 0. Hopefully.
 
