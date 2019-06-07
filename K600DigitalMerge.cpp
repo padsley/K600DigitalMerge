@@ -106,8 +106,9 @@ int main(int argc, char *argv[])
     
     int DigEventNumber = 0;
     double TACDifference = 0;
-    trout->Branch("DigEventNumber",&DigEventNumber,"DigEventNumber/I");
-    trout->Branch("TACDifference",&TACDifference,"TACDifference/D");
+    TBranch *t_DigEventNumber = trout->Branch("DigEventNumber",&DigEventNumber,"DigEventNumber/I");
+    TBranch *t_TACDifference = trout->Branch("TACDifference",&TACDifference,"TACDifference/D");
+    
     
     int nDigitalTreeBranches = tDig->GetNbranches();
     double trig_time = 0;
@@ -138,6 +139,9 @@ int main(int argc, char *argv[])
     {
         if(VeryVerboseFlag)std::cout << "Entry: " << i << std::endl;
         if(i%10000 == 0)std::cout << "\rEntry: " << i << " of " << tVME->GetEntries() << "      " << "EventOffset: " << EventOffset << std::flush;
+        if(i==tVME->GetEntries()-1)std::cout << "\r        Final Event!            " << std::flush;
+        
+        CorrelatedDigitalEvent = false;
         
         tVME->GetEntry(i);
         if(VeryVerboseFlag)std::cout << "VMETAC: " << VMETAC << std::endl;
@@ -164,21 +168,27 @@ int main(int argc, char *argv[])
                 gSkips->SetPoint(MergedEventsCounter,MergedEventsCounter,EventOffset);
                 MergedEventsCounter++;
                 
+                
+                DigEventNumber = i + EventOffset;
+                t_DigEventNumber->Fill();
+                t_TACDifference->Fill();
                 t_Evtnum->Fill();
                 t_Ge_time->Fill();
                 t_Ge_rawEnergy->Fill();
                 t_Ge_calEnergy->Fill();
+                CorrelatedDigitalEvent = true;
+                t_CorrelatedDigitalEvent->Fill();
                 //                 UsedDigitalEvent[i+EventOffset] = true;
             }
         }
     }
     
-    if(VerboseFlag)trout->Print();//Print at the end to get some idea if the branches have been filled
+    trout->Print();//Print at the end to get some idea if the branches have been filled
     
-    std::cout << "Got to the end of merging the files - now writing some potentially useful graphs and making sure that the TTree is in the output file - writing the TTree may take a while so be patient..." << std::endl;
+    
+    std::cout << "Got to the end of merging the files - now writing some potentially useful graphs" << std::endl;
     gTACDifferences->Write();
     gSkips->Write();
-    trout->Write();
     
     fVME->Close();
     fDig->Close();
@@ -206,43 +216,47 @@ int ReAlignDAQs(int VMEEventNumber, int EventOffset, TTree* tVME, TTree *tDig)
     
     while(abs(result-EventOffset)<EventOffsetLimit && !MatchEvents)
     {
-        if(VMEEventNumber + result < tDig->GetEntries())
+        if(VeryVerboseFlag)std::cout << "result (finding new TAC match): " << result << std::endl;
+        
+        if(VeryVerboseFlag)std::cout << "EventOffset = " << result << std::endl;
+        if(VeryVerboseFlag)std::cout << "This is " << result-EventOffset << " more skips since the last matching event" << std::endl;
+        
+        tVME->GetEntry(VMEEventNumber);
+        tDig->GetEntry(VMEEventNumber + result);
+        if(VeryVerboseFlag)std::cout << "Realign - VMETAC: " << VMETAC << std::endl;
+        if(VeryVerboseFlag)std::cout << "Realign - DigTAC: " << DigTAC << std::endl;
+        
+        
+        double TACDifference = DigTAC - (TACPar[0] + TACPar[1] * (double)VMETAC);
+        
+        if(VeryVerboseFlag)std::cout << "Realign - TACDifference: " << TACDifference << std::endl;
+        
+        if(UsedDigitalEvent[VMEEventNumber + result] && VeryVerboseFlag)std::cout << "Already correlated this digital event!" << std::endl;
+        
+        if(DigTAC>0 && abs(DigTAC - (TACPar[0] +TACPar[1]*VMETAC))<DifferenceLimit && VMEEventNumber + result < tDig->GetEntries())
         {
-            if(VeryVerboseFlag)std::cout << "EventOffset = " << result << std::endl;
-            if(VeryVerboseFlag)std::cout << "This is " << result-EventOffset << " more skips since the last matching event" << std::endl;
-            
-            tVME->GetEntry(VMEEventNumber);
-            tDig->GetEntry(VMEEventNumber + result);
-            if(VeryVerboseFlag)std::cout << "Realign - VMETAC: " << VMETAC << std::endl;
-            if(VeryVerboseFlag)std::cout << "Realign - DigTAC: " << DigTAC << std::endl;
-            
-            
-            double TACDifference = DigTAC - (TACPar[0] + TACPar[1] * (double)VMETAC);
-            
-            if(VeryVerboseFlag)std::cout << "Realign - TACDifference: " << TACDifference << std::endl;
-            
-            if(UsedDigitalEvent[VMEEventNumber + result] && VeryVerboseFlag)std::cout << "Already correlated this digital event!" << std::endl;
-            
-            if(DigTAC>0 && abs(DigTAC - (TACPar[0] +TACPar[1]*VMETAC))<DifferenceLimit && !UsedDigitalEvent[VMEEventNumber + result])
+            if(!UsedDigitalEvent[VMEEventNumber + result])
             {
                 MatchEvents = true;
                 UsedDigitalEvent[VMEEventNumber + result] = true;
                 if(VeryVerboseFlag)std::cout << "Found GOOD matching event with TACDifference of: " << TACDifference << std::endl;
             } 
-            else if(PositiveMove)
-            {
-                result = result + StepSize;
-                PositiveMove = false;
-            }
-            else if(!PositiveMove)
-            {
-                result = result - StepSize;
-                PositiveMove = true;
-            }
-            
-            
-            if(VeryVerboseFlag)std::cout << std::endl;
         }
+        
+        if(!MatchEvents && PositiveMove)
+        {
+            result = result + StepSize;
+            PositiveMove = false;
+        }
+        else if(!MatchEvents && !PositiveMove)
+        {
+            result = result - StepSize;
+            PositiveMove = true;
+        }
+        
+        
+        if(VeryVerboseFlag)std::cout << std::endl;
+        
         StepSize++;
     }
     
@@ -261,33 +275,37 @@ int ReAlignDAQs(int VMEEventNumber, int EventOffset, TTree* tVME, TTree *tDig)
         
         while(abs(result - EventOffset)<EventOffsetLimit && !MatchEvents)
         {
-            if(VMEEventNumber + result < tDig->GetEntries())
+            if(VeryVerboseFlag)std::cout << "result (finding a zero): " << result << std::endl;
+            
+            tVME->GetEntry(VMEEventNumber);
+            tDig->GetEntry(VMEEventNumber+EventOffset);
+            
+            if(VeryVerboseFlag)std::cout << "EventOffset = " << result << std::endl;
+            if(VeryVerboseFlag)std::cout << "This is " << result-EventOffset << " more skips since the last matching event" << std::endl;
+            if(VeryVerboseFlag)std::cout << "Find a zero - DigTAC: " << DigTAC << std::endl;
+            if(UsedDigitalEvent[VMEEventNumber + result] && VeryVerboseFlag)std::cout << "Already used this digital event" << std::endl;
+            
+            if(DigTAC == 0 && VMEEventNumber + result < tDig->GetEntries()) 
             {
-                tVME->GetEntry(VMEEventNumber);
-                tDig->GetEntry(VMEEventNumber+EventOffset);
-                
-                if(VeryVerboseFlag)std::cout << "EventOffset = " << result << std::endl;
-                if(VeryVerboseFlag)std::cout << "This is " << result-EventOffset << " more skips since the last matching event" << std::endl;
-                if(VeryVerboseFlag)std::cout << "Find a zero - DigTAC: " << DigTAC << std::endl;
-                if(UsedDigitalEvent[VMEEventNumber + result] && VeryVerboseFlag)std::cout << "Already used this digital event" << std::endl;
-                
-                if(DigTAC == 0 && !UsedDigitalEvent[VMEEventNumber + result])
+                if(!UsedDigitalEvent[VMEEventNumber + result])
                 {
                     MatchEvents = true;
-                    UsedDigitalEvent[VMEEventNumber + result];
+                    UsedDigitalEvent[VMEEventNumber + result] = true;
                 }
-                else if(PositiveMove)
-                {
-                    result = result + StepSize;
-                    PositiveMove = false;
-                }
-                else if(!PositiveMove)
-                {
-                    result = result - StepSize;
-                    PositiveMove = true;
-                }
-                if(VeryVerboseFlag)std::cout << std::endl;
             }
+            
+            if(!MatchEvents && PositiveMove)
+            {
+                result = result + StepSize;
+                PositiveMove = false;
+            }
+            else if(!MatchEvents && !PositiveMove)
+            {
+                result = result - StepSize;
+                PositiveMove = true;
+            }
+            if(VeryVerboseFlag)std::cout << std::endl;
+            
             StepSize++;
         }
     }
