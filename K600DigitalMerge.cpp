@@ -183,7 +183,7 @@ int main(int argc, char *argv[])
         }
     }
     
-    trout->Print();//Print at the end to get some idea if the branches have been filled
+    if(VeryVerboseFlag)trout->Print();//Print at the end to get some idea if the branches have been filled
     
     
     std::cout << "Got to the end of merging the files - now writing some potentially useful graphs" << std::endl;
