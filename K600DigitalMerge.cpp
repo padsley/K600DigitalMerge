@@ -177,10 +177,10 @@ int main(int argc, char *argv[])
                 t_Ge_rawEnergy->Fill();
                 t_Ge_calEnergy->Fill();
                 CorrelatedDigitalEvent = true;
-                t_CorrelatedDigitalEvent->Fill();
-                //                 UsedDigitalEvent[i+EventOffset] = true;
             }
+            
         }
+        t_CorrelatedDigitalEvent->Fill();
     }
     
     if(VeryVerboseFlag)trout->Print();//Print at the end to get some idea if the branches have been filled
@@ -189,6 +189,7 @@ int main(int argc, char *argv[])
     std::cout << "Got to the end of merging the files - now writing some potentially useful graphs" << std::endl;
     gTACDifferences->Write();
     gSkips->Write();
+    trout->Write();
     
     fVME->Close();
     fDig->Close();
