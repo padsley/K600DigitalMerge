@@ -102,7 +102,9 @@ int main(int argc, char *argv[])
     
     //Now creat the output merged file
     TFile *fOut = new TFile(Form("merged%d.root",RunNumber),"RECREATE");
-    TTree *trout = (TTree*)tVME->Clone("MergedData");
+    fOut->ls();
+    fOut->cd();
+    TTree *trout = (TTree*)tVME->CloneTree();
     
     int DigEventNumber = 0;
     double TACDifference = 0;
@@ -190,6 +192,7 @@ int main(int argc, char *argv[])
     gTACDifferences->Write();
     gSkips->Write();
     trout->Write();
+    tVME->CloneTree()->Write();
     
     fVME->Close();
     fDig->Close();
