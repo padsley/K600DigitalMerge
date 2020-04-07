@@ -105,6 +105,7 @@ int main(int argc, char *argv[])
     fOut->ls();
     fOut->cd();
     TTree *trout = (TTree*)tVME->CloneTree();
+    trout->SetName("MergedData");
     
     int DigEventNumber = 0;
     double TACDifference = 0;
@@ -166,6 +167,7 @@ int main(int argc, char *argv[])
             
             if(DigTAC>0 && abs(DigTAC - (TACPar[0] +TACPar[1]*VMETAC))<DifferenceLimit)
             {
+                if(VeryVerboseFlag)std::cout << "Successful correlation - filling relevant branches" << std::endl;
                 gTACDifferences->SetPoint(MergedEventsCounter,MergedEventsCounter,TACDifference);
                 gSkips->SetPoint(MergedEventsCounter,MergedEventsCounter,EventOffset);
                 MergedEventsCounter++;
@@ -192,7 +194,7 @@ int main(int argc, char *argv[])
     gTACDifferences->Write();
     gSkips->Write();
     trout->Write();
-    tVME->CloneTree()->Write();
+//     tVME->CloneTree()->Write();
     
     fVME->Close();
     fDig->Close();
