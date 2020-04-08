@@ -8,6 +8,7 @@
 #include <TGraph.h>
 #include <TTreeReader.h>
 #include <TSystem.h>
+#include <TH1.h>
 // #include "GammaData.h"
 // #include "RawData.h"
 

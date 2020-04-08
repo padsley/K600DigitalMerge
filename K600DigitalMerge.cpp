@@ -14,11 +14,23 @@ int main(int argc, char *argv[])
     
     int EventOffset = 0;
     
+    TGraph *gTACValues = new TGraph();
+    gTACValues->SetName("gTACValues");    
+    TGraph *gGoodTACValues = new TGraph();
+    gGoodTACValues->SetName("gGoodTACValues");
+    TGraph *gAlreadyGoodTACValues = new TGraph();
+    gAlreadyGoodTACValues->SetName("gAlreadyGoodTACValues");
     TGraph *gTACDifferences = new TGraph();
     gTACDifferences->SetName("gTACDifferences");
+    TGraph *gTACDifferences2 = new TGraph();
+    gTACDifferences2->SetName("gTACDifferences2");
     TGraph *gSkips = new TGraph();
     gSkips->SetName("gSkips");
     int MergedEventsCounter = 0;
+    
+    TH1F *DigitalTACHisto = new TH1F("DigitalTACHisto","DigitalTACHisto",10000,0,10000);
+    TH1F *VMETACHisto = new TH1F("VMETACHisto","VMETACHisto",4100,0,4100);
+    TH1F *TACDifferenceHisto = new TH1F("TACDifferenceHisto","TACDifferenceHisto",20000,-10000,10000);
     
     if(argc!=4)
     {
@@ -121,13 +133,11 @@ int main(int argc, char *argv[])
     trout->SetName("MergedData");
     
     int DigEventNumber = 0;
+    double WriteDigTAC = 0;
     double TACDifference = 0;
     TBranch *t_DigEventNumber = trout->Branch("DigEventNumber",&DigEventNumber,"DigEventNumber/I");
+    TBranch *t_DigTAC = trout->Branch("DigTAC",&WriteDigTAC,"DigTAC/D");
     TBranch *t_TACDifference = trout->Branch("TACDifference",&TACDifference,"TACDifference/D");
-    
-    
-
-
     
     bool CorrelatedDigitalEvent = false;
     
@@ -140,6 +150,7 @@ int main(int argc, char *argv[])
     if(VeryVerboseFlag)trout->Print();//Now print out the information in the combined TTree to check that the branches have the right names and types and sizes
     
     //Now loop over all the entries in the VME DAQ to look for 
+//     int TACRawCounter = 0, TACGoodCounter = 0;
     for(Long64_t i=0;i<tVME->GetEntries();i++)
     {
         if(VeryVerboseFlag)std::cout << "Entry: " << i << std::endl;
@@ -156,6 +167,9 @@ int main(int argc, char *argv[])
         
         if(DigTAC>0 && VMETAC>0)
         {
+            gTACValues->SetPoint(gTACValues->GetN(),VMETAC,DigTAC);
+//             TACRawCounter++;
+                                 
             TACDifference = DigTAC - (TACPar[0] + TACPar[1] * (double)VMETAC);
             
             if(VeryVerboseFlag)std::cout << "TACDifference: " << TACDifference << std::endl;
@@ -166,15 +180,29 @@ int main(int argc, char *argv[])
                 tDig->GetEntry(i + EventOffset);
                 TACDifference = DigTAC - (TACPar[0] + TACPar[1] * (double)VMETAC);
             }
-            
-            if(DigTAC>0 && abs(DigTAC - (TACPar[0] +TACPar[1]*VMETAC))<DifferenceLimit)
+            else
             {
+                if(VeryVerboseFlag)std::cout << "Good TACDifference for this event already" << std::endl;
+                gAlreadyGoodTACValues->SetPoint(gAlreadyGoodTACValues->GetN(),VMETAC,DigTAC);
+            }
+            
+            if(abs(DigTAC - (TACPar[0] + TACPar[1]*(double)VMETAC))<DifferenceLimit)
+            {
+                gGoodTACValues->SetPoint(gGoodTACValues->GetN(),VMETAC,DigTAC);
                 if(VeryVerboseFlag)std::cout << "Successful correlation - filling relevant branches" << std::endl;
                 gTACDifferences->SetPoint(MergedEventsCounter,MergedEventsCounter,TACDifference);
+                gTACDifferences2->SetPoint(gTACDifferences2->GetN(),VMETAC,TACDifference);
                 gSkips->SetPoint(MergedEventsCounter,MergedEventsCounter,EventOffset);
                 MergedEventsCounter++;
                 
                 Evtnum = ReadEvtnum;
+                WriteDigTAC = DigTAC;
+                
+                DigitalTACHisto->Fill(WriteDigTAC);
+                VMETACHisto->Fill(VMETAC);
+                
+                TACDifferenceHisto->Fill(TACDifference);
+                
                 for(int p=0;p<48;p++)
                 {
                     Ge_time[p] = ReadGe_time[p];
@@ -183,25 +211,79 @@ int main(int argc, char *argv[])
                 }
                 
                 DigEventNumber = i + EventOffset;
+                CorrelatedDigitalEvent = true;
                 t_DigEventNumber->Fill();
                 t_TACDifference->Fill();
                 t_Evtnum->Fill();
                 t_Ge_time->Fill();
                 t_Ge_rawEnergy->Fill();
                 t_Ge_calEnergy->Fill();
-                CorrelatedDigitalEvent = true;
+                t_DigTAC->Fill();
+                t_CorrelatedDigitalEvent->Fill();
+            }
+            else
+            {
+                if(VeryVerboseFlag)std::cout << "Could not find correlated digital DAQ event for this VME DAQ event" << std::endl;
+                
+                for(int p=0;p<48;p++)
+                {
+                    Ge_time[p] =  -1;
+                    Ge_rawEnergy[p] = -1;
+                    Ge_calEnergy[p] = -1;
+                }
+                Evtnum = -1;
+                CorrelatedDigitalEvent = false;
+                DigEventNumber = i + EventOffset;
+                t_DigEventNumber->Fill();
+                t_TACDifference->Fill();
+                t_Evtnum->Fill();
+                t_Ge_time->Fill();
+                t_Ge_rawEnergy->Fill();
+                t_Ge_calEnergy->Fill();
+                t_DigTAC->Fill();
+                t_CorrelatedDigitalEvent->Fill();
             }
             
         }
-        t_CorrelatedDigitalEvent->Fill();
+        else if(DigTAC==0 && VMETAC>0)
+        {
+            if(VeryVerboseFlag)std::cout << "Have to deal with event which does not have a DigTAC value - going to throw some null results into the TTree" << std::endl;
+            for(int p=0;p<48;p++)
+                {
+                    Ge_time[p] =  -1;
+                    Ge_rawEnergy[p] = -1;
+                    Ge_calEnergy[p] = -1;
+                }
+                Evtnum = -1;
+                CorrelatedDigitalEvent = false;
+                DigEventNumber = i + EventOffset;
+                t_DigEventNumber->Fill();
+                t_TACDifference->Fill();
+                t_Evtnum->Fill();
+                t_Ge_time->Fill();
+                t_Ge_rawEnergy->Fill();
+                t_Ge_calEnergy->Fill();
+                t_DigTAC->Fill();
+                t_CorrelatedDigitalEvent->Fill();
+        }
+            
+            
+//         t_CorrelatedDigitalEvent->Fill();
     }
     
     if(VeryVerboseFlag)trout->Print();//Print at the end to get some idea if the branches have been filled
     
     
     std::cout << "Got to the end of merging the files - now writing some potentially useful graphs" << std::endl;
+    gTACValues->Write();
+    gGoodTACValues->Write();
+    gAlreadyGoodTACValues->Write();
     gTACDifferences->Write();
+    gTACDifferences2->Write();
     gSkips->Write();
+    DigitalTACHisto->Write();
+    VMETACHisto->Write();
+    TACDifferenceHisto->Write();
     trout->Write();
 //     tVME->CloneTree()->Write();
     
