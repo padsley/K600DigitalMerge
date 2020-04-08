@@ -78,17 +78,30 @@ int main(int argc, char *argv[])
         if(VeryVerboseFlag)fDig->ls();
     }
     
-    TTree *tDig = (TTree*)fDig->Get("DATA");
-    tDig->SetBranchAddress("tac_energy",&DigTAC);
-    //     for(Long64_t i = 0; i<tDig->GetEntries();i++)
-    //     {
-    //         tDig->GetEntry(i);
-    //         std::cout << "DigTAC: " << DigTAC << std::endl;
-    //     }
-    //     
     
-    //     GammaData *gammy;
-    //     RawData *roar;
+    TTree *tDig = (TTree*)fDig->Get("DATA");
+    
+    int nDigitalTreeBranches = tDig->GetNbranches();
+    double trig_time = 0;
+    double tac_time = 0;
+    int trig_scaler = 0;
+    int tac_scaler = 0;
+    int trig_rate = 0;
+    int tac_rate = 0;
+    int tac_energy = 0;
+    int Evtnum = 0;
+    int trig_cnt = 0;
+    double Ge_time[48];
+    double Ge_rawEnergy[48];
+    double Ge_calEnergy[48];
+    
+    
+    tDig->SetBranchAddress("tac_energy",&DigTAC);
+    tDig->SetBranchAddress("Evtnum",&ReadEvtnum);
+    tDig->SetBranchAddress("Ge_time",&ReadGe_time);
+    tDig->SetBranchAddress("Ge_rawEnergy",&ReadGe_rawEnergy);
+    tDig->SetBranchAddress("Ge_calEnergy",&ReadGe_calEnergy);
+
     
     std::cout << std::endl << "******************************************************" << std::endl;
     std::cout << "VME Tree Entries: " << tVME->GetEntries() << std::endl;
@@ -113,19 +126,8 @@ int main(int argc, char *argv[])
     TBranch *t_TACDifference = trout->Branch("TACDifference",&TACDifference,"TACDifference/D");
     
     
-    int nDigitalTreeBranches = tDig->GetNbranches();
-    double trig_time = 0;
-    double tac_time = 0;
-    int trig_scaler = 0;
-    int tac_scaler = 0;
-    int trig_rate = 0;
-    int tac_rate = 0;
-    int tac_energy = 0;
-    int Evtnum = 0;
-    int trig_cnt = 0;
-    double Ge_time[48];
-    double Ge_rawEnergy[48];
-    double Ge_calEnergy[48];
+
+
     
     bool CorrelatedDigitalEvent = false;
     
@@ -172,6 +174,13 @@ int main(int argc, char *argv[])
                 gSkips->SetPoint(MergedEventsCounter,MergedEventsCounter,EventOffset);
                 MergedEventsCounter++;
                 
+                Evtnum = ReadEvtnum;
+                for(int p=0;p<48;p++)
+                {
+                    Ge_time[p] = ReadGe_time[p];
+                    Ge_rawEnergy[p] = ReadGe_rawEnergy[p];
+                    Ge_calEnergy[p] = ReadGe_calEnergy[p];
+                }
                 
                 DigEventNumber = i + EventOffset;
                 t_DigEventNumber->Fill();
