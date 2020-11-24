@@ -41,8 +41,11 @@ int main(int argc, char *argv[])
     std::cout << "Run number is set according to the VME file" << std::endl;
     
     std::string RunName = argv[1];
-    if(VeryVerboseFlag)std::cout << RunName.substr(6,5) << std::endl;
-    int RunNumber = atoi(RunName.substr(6,5).c_str());
+    std::string TestString ("sorted");
+    std::size_t position = RunName.find(TestString);
+    
+    if(VeryVerboseFlag)std::cout << "RunName.substr(position+6,5): " << RunName.substr(position+6,5) << std::endl;
+    int RunNumber = atoi(RunName.substr(position+6,5).c_str());
     if(VerboseFlag)std::cout << "Run number: " << RunNumber << std::endl;
     
     std::cout << "Using VME DAQ file: " << argv[1] << std::endl;
