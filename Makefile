@@ -1,6 +1,6 @@
 
 CXX=g++
-CFLAGS =-I.
+CFLAGS =-g -I.
 ROOTCFLAGS := $(shell  $(ROOTSYS)/bin/root-config --cflags --libs)
 OBJ = K600DigitalMerge.cpp
 

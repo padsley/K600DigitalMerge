@@ -32,9 +32,9 @@ int main(int argc, char *argv[])
     TH1F *VMETACHisto = new TH1F("VMETACHisto","VMETACHisto",4100,0,4100);
     TH1F *TACDifferenceHisto = new TH1F("TACDifferenceHisto","TACDifferenceHisto",20000,-10000,10000);
     
-    if(argc!=4)
+    if(argc!=5)
     {
-        fprintf(stderr, "usage: mcerr <filename for VME DAQ> <filename for digital DAQ> <verbosity setting - 1 is verbose, 2 is very verbose, anything else is false>\n");
+        fprintf(stderr, "usage: mcerr <filename for VME DAQ> <filename for digital DAQ> <verbosity setting - 1 is verbose, 2 is very verbose, anything else is false> <limit for number of events to skip for alignment>\n");
         exit(1);
     }
     
@@ -49,6 +49,9 @@ int main(int argc, char *argv[])
         VerboseFlag = true;
         VeryVerboseFlag = true;
     }
+    
+    EventOffsetLimit = atoi(argv[4]);
+    std::cout << "Setting the maximum number of events to skip for alignment to " << EventOffsetLimit << std::endl;
     
     std::cout << "Run number is set according to the VME file" << std::endl;
     
@@ -132,8 +135,9 @@ int main(int argc, char *argv[])
     TFile *fOut = new TFile(Form("merged%d.root",RunNumber),"RECREATE");
     fOut->ls();
     fOut->cd();
-    TTree *trout = (TTree*)tVME->CloneTree();
+    TTree *trout = (TTree*)tVME->CloneTree(-1,"fast");
     trout->SetName("MergedData");
+    fOut->ls();
     
     int DigEventNumber = 0;
     double WriteDigTAC = 0;
@@ -162,13 +166,21 @@ int main(int argc, char *argv[])
         
         CorrelatedDigitalEvent = false;
         
-        tVME->GetEntry(i);
+        int VMEEntryReturn = -2, DigEntryReturn = -2;
+        
+        VMEEntryReturn = tVME->GetEntry(i);
         if(VeryVerboseFlag)std::cout << "VMETAC: " << VMETAC << std::endl;
         
-        tDig->GetEntry(i + EventOffset);
+        DigEntryReturn = tDig->GetEntry(i + EventOffset);
         if(VeryVerboseFlag)std::cout << "DigTAC: " << DigTAC << std::endl;
         
-        if(DigTAC>0 && VMETAC>0)
+        if(VerboseFlag && VMEEntryReturn==0)std::cout << "VME entry does not exist" << std::endl;
+        if(VerboseFlag && VMEEntryReturn==-1)std::cout << "VME entry I/O error" << std::endl;
+        
+        if(VerboseFlag && DigEntryReturn==0)std::cout << "Digital entry does not exist" << std::endl;
+        if(VerboseFlag && DigEntryReturn==-1)std::cout << "Digital entry I/O error" << std::endl;
+        
+        if(DigTAC>0 && VMETAC>0 && VMEEntryReturn>0 && DigEntryReturn>0)
         {
             gTACValues->SetPoint(gTACValues->GetN(),VMETAC,DigTAC);
 //             TACRawCounter++;
@@ -278,6 +290,8 @@ int main(int argc, char *argv[])
     
     
     std::cout << "Got to the end of merging the files - now writing some potentially useful graphs" << std::endl;
+    std::cout << "Writing the merged data tree" << std::endl;
+    trout->Write();
     gTACValues->Write();
     gGoodTACValues->Write();
     gAlreadyGoodTACValues->Write();
@@ -287,14 +301,31 @@ int main(int argc, char *argv[])
     DigitalTACHisto->Write();
     VMETACHisto->Write();
     TACDifferenceHisto->Write();
-    trout->Write();
-//     tVME->CloneTree()->Write();
     
-    fVME->Close();
-    fDig->Close();
+    delete gTACValues;
+    delete gGoodTACValues;
+    delete gAlreadyGoodTACValues;
+    delete gTACDifferences;
+    delete gTACDifferences2;
+    delete gSkips;
+    delete DigitalTACHisto;
+    delete VMETACHisto;
+    delete TACDifferenceHisto;
+    
+    std::cout << "Closing the files" << std::endl;
+//     fOut->ls();
     fOut->Close();
+    std::cout << "Closing the files" << std::endl;
+    fVME->cd();
+//     fVME->ls();
+//     delete tVME;
+    fVME->Close();
+    std::cout << "Closing the files" << std::endl;
+//     delete tDig;
+    fDig->Close();
     
-    delete [] UsedDigitalEvent;
+    std::cout << "Finished writing all of the data" << std::endl;
+//     delete [] UsedDigitalEvent;
     
     std::cout << "Finished" << std::endl;
     std::cout << std::endl;

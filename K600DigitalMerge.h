@@ -18,7 +18,7 @@ double DifferenceLimit = 100;
 
 int ReAlignDAQs(int VMEEventNumber, int EventOffset, TTree* VMETree, TTree *DigitalTree);
 
-int EventOffsetLimit = 5;
+int EventOffsetLimit = 0;
 
 int VMETAC = 0;
 double DigTAC = 0;
