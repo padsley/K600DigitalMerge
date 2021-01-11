@@ -109,12 +109,14 @@ int main(int argc, char *argv[])
     int tac_energy = 0;
     int Evtnum = 0;
     int trig_cnt = 0;
+    double DigTrigTime = 0;
     double Ge_time[48];
     double Ge_rawEnergy[48];
     double Ge_calEnergy[48];
     
     
     tDig->SetBranchAddress("tac_energy",&DigTAC);
+    tDig->SetBranchAddress("trig_time",&ReadDigTrigTime);
     tDig->SetBranchAddress("Evtnum",&ReadEvtnum);
     tDig->SetBranchAddress("Ge_time",&ReadGe_time);
     tDig->SetBranchAddress("Ge_rawEnergy",&ReadGe_rawEnergy);
@@ -149,6 +151,7 @@ int main(int argc, char *argv[])
     bool CorrelatedDigitalEvent = false;
     
     TBranch *t_Evtnum = trout->Branch("Evtnum",&Evtnum,"Evtnum/I");
+    TBranch *t_DigTrigTime = trout->Branch("DigTrigTime",&DigTrigTime,"DigTrigTime/D");
     TBranch *t_Ge_time = trout->Branch("Ge_time",&Ge_time,"Ge_time[48]/D");
     TBranch *t_Ge_rawEnergy = trout->Branch("Ge_rawEnergy",&Ge_rawEnergy,"Ge_rawEnergy[48]/D");
     TBranch *t_Ge_calEnergy = trout->Branch("Ge_calEnergy",&Ge_calEnergy,"Ge_calEnergy[48]/D");
@@ -210,6 +213,9 @@ int main(int argc, char *argv[])
                 gSkips->SetPoint(MergedEventsCounter,MergedEventsCounter,EventOffset);
                 MergedEventsCounter++;
                 
+                DigTrigTime = ReadDigTrigTime;
+                if(VeryVerboseFlag)std::cout << "ReadDigTrigTime = " << ReadDigTrigTime << "\t DigTrigTime = " << DigTrigTime << std::endl; 
+                
                 Evtnum = ReadEvtnum;
                 WriteDigTAC = DigTAC;
                 
@@ -227,6 +233,7 @@ int main(int argc, char *argv[])
                 
                 DigEventNumber = i + EventOffset;
                 CorrelatedDigitalEvent = true;
+                t_DigTrigTime->Fill();
                 t_DigEventNumber->Fill();
                 t_TACDifference->Fill();
                 t_Evtnum->Fill();
@@ -249,6 +256,8 @@ int main(int argc, char *argv[])
                 Evtnum = -1;
                 CorrelatedDigitalEvent = false;
                 DigEventNumber = i + EventOffset;
+                DigTrigTime = -1;
+                t_DigTrigTime->Fill();
                 t_DigEventNumber->Fill();
                 t_TACDifference->Fill();
                 t_Evtnum->Fill();
@@ -271,8 +280,10 @@ int main(int argc, char *argv[])
                 }
                 Evtnum = -1;
                 CorrelatedDigitalEvent = false;
+                DigTrigTime = -1;
                 DigEventNumber = i + EventOffset;
                 t_DigEventNumber->Fill();
+                t_DigTrigTime->Fill();
                 t_TACDifference->Fill();
                 t_Evtnum->Fill();
                 t_Ge_time->Fill();
