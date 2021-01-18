@@ -22,3 +22,9 @@ If you try to run the code with the wrong number of arguments then it won't run 
 Now, I've tested this with a couple of files and it seems to work fairly well if not perfectly. However, it's possible that some things may need to change in the code. For example, the limit for the TAC differences.
 
 You can change this parameters along with the TAC rescaling parameters in the header file. If you do change them, you need to recompile the code before running it again. The number of skips is read at runtime so you can change that without recompiling.
+
+A minor but potentially important note - I changed one thing which seemed to make the code much quicker, which was to use "fast" as an argument to CloneTree:
+
+```If 'option' contains the word 'fast' and nentries is -1, the cloning will be done without unzipping or unstreaming the baskets (i.e., a direct copy of the raw bytes on disk).```
+
+This seems to make things much quicker and I recommend not changing it if you can help it.
